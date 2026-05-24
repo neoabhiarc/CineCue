@@ -351,7 +351,17 @@ export default function App() {
   const savedCues = safeParseArray(safeStorageGet("cinecue-cues-v5", "[]"));
   const initialCues = savedCues.length ? savedCues.map(canonicalCue) : defaultCues.map(canonicalCue);
 
-  const [host, setHost] = useState(() => safeStorageGet("cinecue-host", "http://wled-abhi.local"));
+  const [host, setHost] = useState(() => {
+    const savedV2 = safeStorageGet("cinecue-host", "");
+    if (savedV2) return savedV2;
+    const savedV1 = safeStorageGet("wled-host", "");
+    if (savedV1) {
+      return savedV1.startsWith("http://") || savedV1.startsWith("https://")
+        ? savedV1
+        : `http://${savedV1}`;
+    }
+    return "http://wled-abhi.local";
+  });
   const [connectionStatus, setConnectionStatus] = useState("idle");
   const [message, setMessage] = useState("Tap a cue to fire it. Hold or press the pencil to edit.");
   const [cues, setCues] = useState(initialCues);
@@ -588,6 +598,10 @@ export default function App() {
   const matchLabel = matchState === "matched" ? "Matched" : matchState === "diverged" ? "Diverged" : "Unknown";
   const liveDiverged = matchState === "diverged";
 
+  const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+  const isHttpHost = normalizedHost.startsWith("http://");
+  const isMixedContent = isHttps && isHttpHost;
+
   return (
     <div className="min-h-screen bg-[#090c12] text-slate-100">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -610,6 +624,15 @@ export default function App() {
             <div className={`rounded-2xl px-3 py-3 text-sm font-bold ${connectionClass}`}>{connectionLabel}</div>
             <button onClick={testConnection} className="min-h-12 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/10 active:scale-95">Reconnect</button>
           </div>
+
+          {isMixedContent && (
+            <div className="mt-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-200 leading-relaxed">
+              <span className="font-bold">⚠️ Mixed Content Blocked:</span> You are visiting this site via secure HTTPS, but your WLED address starts with HTTP. Browsers block secure sites from talking to local insecure devices.
+              <div className="mt-1.5 font-semibold text-cyan-300">
+                To fix: Click the settings/lock icon in your URL bar, open "Site settings", set "Insecure content" to "Allow" for this domain, and refresh. Alternatively, run the app locally via HTTP.
+              </div>
+            </div>
+          )}
 
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-slate-950/60 px-3 py-3 text-sm text-slate-300 ring-1 ring-white/10">Live: <span className="font-semibold text-white">{liveCue ? liveCue.shortName : "None"}</span></div>
